@@ -68,19 +68,39 @@ module Env : ENV =
     let empty () : env = [] ;;
 
     let close (exp : expr) (env : env) : value =
-      failwith "close not implemented" ;;
+      Closure (exp, env) ;;
 
     let lookup (env : env) (varname : varid) : value =
-      failwith "lookup not implemented" ;;
+      try
+        !(List.assoc varname env)
+      with
+        Not_found -> raise (EvalError("Not found"))
+      ;;
 
     let extend (env : env) (varname : varid) (loc : value ref) : env =
-      failwith "extend not implemented" ;;
+      try 
+        let _v = lookup env varname in
+        List.map (fun (var_name, var_value) -> 
+          if var_name = varname then (var_name, loc)
+          else (var_name, var_value)) env
+      with 
+        Not_found -> (varname, loc) :: env 
+      ;;
 
-    let value_to_string ?(printenvp : bool = true) (v : value) : string =
-      failwith "value_to_string not implemented" ;;
+    let rec value_to_string ?(printenvp : bool = true) (v : value) : string =
+      match v with 
+      | Val e -> exp_to_concrete_string e
+      | Closure (exp, env) -> if printenvp then  exp_to_concrete_string exp ^
+                              " in environment: " ^ env_to_string env
+                              else exp_to_concrete_string exp 
+    and env_to_string (env : env) : string =
+      match env with
+      | [] -> ""
+      | (var_id, val_ref) :: [] -> var_id ^ " = " ^ value_to_string !val_ref
+      | (var_id, val_ref) :: tl -> var_id ^ " = " ^ value_to_string !val_ref ^
+                                   ", " ^ env_to_string tl
+      ;;
 
-    let env_to_string (env : env) : string =
-      failwith "env_to_string not implemented" ;;
   end
 ;;
 
@@ -113,20 +133,77 @@ let eval_t (exp : expr) (_env : Env.env) : Env.value =
   (* coerce the expr, unchanged, into a value *)
   Env.Val exp ;;
 
+let bin_eval (b : binop) 
+             (Env.Val e1 : Env.value) 
+             (Env.Val e2 : Env.value) : Env.value = 
+  match b, e1, e2 with
+  | Plus, Num x, Num y -> Env.Val (Num (x + y))
+  | Plus, Float x, Float y -> Env.Val (Float (x +. y))
+  | Plus, _, _ -> raise (EvalError "not numbers")
+  | Minus, Num x, Num y -> Env.Val (Num (x - y))
+  | Minus, Float x, Float y -> Env.Val (Float (x -. y))
+  | Minus, _, _ -> raise (EvalError "not numbers")
+  | Times, Num x, Num y -> Env.Val (Num (x * y))
+  | Times, Float x, Float y -> Env.Val (Float (x *. y))
+  | Times, _, _ -> raise (EvalError "not numbers")
+  | Divide, Num x, Num y -> Env.Val (Num (x / y))
+  | Divide, Float x, Float y -> Env.Val (Float (x /. y))
+  | Divide, _, _ -> raise (EvalError "not numbers")
+  | Equals, Num x, Num y -> Env.Val (Bool (x = y))
+  | Equals, Float x, Float y -> Env.Val (Bool (x = y))
+  | Equals, Bool x, Bool y -> Env.Val (Bool (x = y))
+  | Equals, _, _ ->  raise (EvalError "not equal")
+  | LessThan, Num x, Num y -> Env.Val (Bool (x < y))
+  | LessThan, Float x, Float y -> Env.Val (Bool (x < y))
+  | LessThan, _, _ -> raise (EvalError "not numbers")
+  | GreaterThan, Num x, Num y -> Env.Val (Bool (x > y))
+  | GreaterThan, Float x, Float y -> Env.Val (Bool (x > y))
+  | GreaterThan, _, _ -> raise (EvalError "not numbers")
+;; 
+
+let u_eval (u : unop) (Env.Val e : Env.value) : Env.value =
+  match u, e with
+  | Negate, Num n -> Env.Val (Num (~- n))
+  | Negate, Float f -> Env.Val (Float (~-. f))
+  | Negate, _ -> raise (EvalError "not integer") 
+;;
+
+let make_val (Env.Val value : Env.value) : expr = value ;;
+
 (* The SUBSTITUTION MODEL evaluator -- to be completed *)
    
 let eval_s (_exp : expr) (_env : Env.env) : Env.value =
-  failwith "eval_s not implemented" ;;
+  let rec eval2 (ex : expr) : Env.value =
+    match ex with
+    | Var _v -> raise (EvalError ("Unbound Variable"))                
+    | Num _ | Float _ | Bool _ | Str _ | Unassigned -> Env.Val ex                                                
+    | Unop (u, e) -> u_eval u (eval2 e)                
+    | Binop (b, e1, e2) -> bin_eval b (eval2 e1) (eval2 e2)    
+    | Conditional (e1, e2, e3) -> 
+        if (eval2 e1 = Env.Val (Bool true)) then eval2 e2 
+        else eval2 e3
+    | Fun (v, e) -> Env.Val (Fun (v, e))
+    | Let (v, e1, e2) -> eval2 (subst v (make_val (eval2 e1)) e2)        
+    | Letrec (v, e1, e2) -> eval2 (subst v (subst v 
+                            (Letrec (v, e1, Var v)) e1) e2)  
+    | Raise -> raise EvalException          
+    | App (e1, e2) -> 
+        match eval2 e1 with 
+        | Env.Val Fun (v, e3) -> eval2 (subst v (make_val (eval2 e2)) e3)
+        | _ -> raise (EvalError "bad redex")
+  in
+  eval2 _exp ;; 
      
 (* The DYNAMICALLY-SCOPED ENVIRONMENT MODEL evaluator -- to be
    completed *)
    
 let eval_d (_exp : expr) (_env : Env.env) : Env.value =
   failwith "eval_d not implemented" ;;
-       
+
+      
 (* The LEXICALLY-SCOPED ENVIRONMENT MODEL evaluator -- optionally
    completed as (part of) your extension *)
-   
+  
 let eval_l (_exp : expr) (_env : Env.env) : Env.value =
   failwith "eval_l not implemented" ;;
 
@@ -146,4 +223,4 @@ let eval_e _ =
    above, not the evaluate function, so it doesn't matter how it's set
    when you submit your solution.) *)
    
-let evaluate = eval_t ;;
+let evaluate = eval_d ;;
