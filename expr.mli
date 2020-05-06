@@ -8,6 +8,7 @@
 (* Unary operators *)
 type unop =
   | Negate
+  | Fact
 ;;
 
 (* Binary operators *)
@@ -19,6 +20,8 @@ type binop =
   | Equals
   | LessThan
   | GreaterThan
+  | Exponent
+  | Mod
 ;;
 
 (* Variables *)

@@ -79,8 +79,8 @@ module Env : ENV =
 
     let extend (env : env) (varname : varid) (loc : value ref) : env =
       try 
-        let _v = lookup env varname in
-        List.map (fun (var_name, var_value) -> 
+        let _v = lookup env varname in 
+          List.map (fun (var_name, var_value) -> 
           if var_name = varname then (var_name, loc)
           else (var_name, var_value)) env
       with 
@@ -109,7 +109,7 @@ module Env : ENV =
   Evaluation functions
 
   Each of the evaluation functions below evaluates an expression `exp`
-  in an enviornment `env` returning a result of type `value`. We've
+  in an environment `env` returning a result of type `value`. We've
   provided an initial implementation for a trivial evaluator, which
   just converts the expression unchanged to a `value` and returns it,
   along with "stub code" for three more evaluators: a substitution
@@ -133,63 +133,90 @@ let eval_t (exp : expr) (_env : Env.env) : Env.value =
   (* coerce the expr, unchanged, into a value *)
   Env.Val exp ;;
 
-let bin_eval (b : binop) 
-             (Env.Val e1 : Env.value) 
-             (Env.Val e2 : Env.value) : Env.value = 
+(* Coerces the value, unchanged, into an expr *)
+let make_expr (v : Env.value) : expr = 
+  match v with
+  | Env.Closure (_, _) -> raise (EvalError "not number")
+  | Env.Val v -> v
+  ;;
+
+let rec fac (x : int) : int = 
+  if x <= 1 then 1 else x * fac (x - 1) ;;
+
+let rec fl_fac (x : float) : float = 
+  if x <= 1. then 1. else x *. fl_fac (x -. 1.) ;;
+
+let u_eval (u : unop) (exp : expr) : Env.value =
+   match u, exp with
+    | Negate, Num n -> Env.Val (Num (~- n))
+    | Negate, Float f -> Env.Val (Float (~-. f))
+    | Negate, _ -> raise (EvalError "not number")
+    | Fact, Num n -> Env.Val (Num (fac n))
+    | Fact, Float n -> Env.Val (Float (fl_fac n))
+    | Fact, _ -> raise (EvalError "not number")
+;;
+
+let bin_eval (b : binop) (e1 : expr) (e2 : expr) : Env.value = 
   match b, e1, e2 with
   | Plus, Num x, Num y -> Env.Val (Num (x + y))
   | Plus, Float x, Float y -> Env.Val (Float (x +. y))
   | Plus, _, _ -> raise (EvalError "not numbers")
+
   | Minus, Num x, Num y -> Env.Val (Num (x - y))
   | Minus, Float x, Float y -> Env.Val (Float (x -. y))
   | Minus, _, _ -> raise (EvalError "not numbers")
+
   | Times, Num x, Num y -> Env.Val (Num (x * y))
   | Times, Float x, Float y -> Env.Val (Float (x *. y))
   | Times, _, _ -> raise (EvalError "not numbers")
+
   | Divide, Num x, Num y -> Env.Val (Num (x / y))
   | Divide, Float x, Float y -> Env.Val (Float (x /. y))
   | Divide, _, _ -> raise (EvalError "not numbers")
-  | Equals, Num x, Num y -> Env.Val (Bool (x = y))
-  | Equals, Float x, Float y -> Env.Val (Bool (x = y))
-  | Equals, Bool x, Bool y -> Env.Val (Bool (x = y))
-  | Equals, _, _ ->  raise (EvalError "not equal")
+
+  | Mod, Num x, Num y -> Env.Val (Num (x mod y))
+  | Mod, _, _ -> raise (EvalError "not integers")
+
+  | Exponent, Float x, Float y -> Env.Val (Float (x ** y))
+  | Exponent, _, _ -> raise (EvalError "not floats")
+
   | LessThan, Num x, Num y -> Env.Val (Bool (x < y))
   | LessThan, Float x, Float y -> Env.Val (Bool (x < y))
   | LessThan, _, _ -> raise (EvalError "not numbers")
+
   | GreaterThan, Num x, Num y -> Env.Val (Bool (x > y))
   | GreaterThan, Float x, Float y -> Env.Val (Bool (x > y))
   | GreaterThan, _, _ -> raise (EvalError "not numbers")
+
+  | Equals, Num x, Num y -> Env.Val (Bool (x = y))
+  | Equals, Float x, Float y -> Env.Val (Bool (x = y))
+  | Equals, Bool x, Bool y -> Env.Val (Bool (x = y))
+  | Equals, Str x, Str y -> Env.Val (Bool (x = y))
+  | Equals, _, _ ->  raise (EvalError "not equal")
+
 ;; 
-
-let u_eval (u : unop) (Env.Val e : Env.value) : Env.value =
-  match u, e with
-  | Negate, Num n -> Env.Val (Num (~- n))
-  | Negate, Float f -> Env.Val (Float (~-. f))
-  | Negate, _ -> raise (EvalError "not integer") 
-;;
-
-let make_val (Env.Val value : Env.value) : expr = value ;;
 
 (* The SUBSTITUTION MODEL evaluator -- to be completed *)
    
 let eval_s (_exp : expr) (_env : Env.env) : Env.value =
   let rec eval2 (ex : expr) : Env.value =
     match ex with
-    | Var _v -> raise (EvalError ("Unbound Variable"))                
+    | Var _ -> raise (EvalError ("Unbound Variable"))                
     | Num _ | Float _ | Bool _ | Str _ | Unassigned -> Env.Val ex                                                
-    | Unop (u, e) -> u_eval u (eval2 e)                
-    | Binop (b, e1, e2) -> bin_eval b (eval2 e1) (eval2 e2)    
-    | Conditional (e1, e2, e3) -> 
-        if (eval2 e1 = Env.Val (Bool true)) then eval2 e2 
-        else eval2 e3
+    | Unop (u, e) -> u_eval u (make_expr(eval2 e))                
+    | Binop (b, e1, e2) -> bin_eval b (make_expr(eval2 e1)) 
+                                      (make_expr(eval2 e2))    
+    | Conditional (e1, e2, e3) -> if (eval2 e1 = Env.Val (Bool true)) 
+                                  then eval2 e2 
+                                  else eval2 e3
     | Fun (v, e) -> Env.Val (Fun (v, e))
-    | Let (v, e1, e2) -> eval2 (subst v (make_val (eval2 e1)) e2)        
+    | Let (v, e1, e2) -> eval2 (subst v (make_expr(eval2 e1)) e2)        
     | Letrec (v, e1, e2) -> eval2 (subst v (subst v 
                             (Letrec (v, e1, Var v)) e1) e2)  
     | Raise -> raise EvalException          
     | App (e1, e2) -> 
         match eval2 e1 with 
-        | Env.Val Fun (v, e3) -> eval2 (subst v (make_val (eval2 e2)) e3)
+        | Env.Val Fun (v, e3) -> eval2 (subst v (make_expr(eval2 e2)) e3)
         | _ -> raise (EvalError "bad redex")
   in
   eval2 _exp ;; 
@@ -198,14 +225,42 @@ let eval_s (_exp : expr) (_env : Env.env) : Env.value =
    completed *)
    
 let eval_d (_exp : expr) (_env : Env.env) : Env.value =
-  failwith "eval_d not implemented" ;;
+  failwith "eval_l not implemented"
+  (*let rec eval_d2 (_exp : expr) (_env : Env.env) : Env.value =
+    match _exp with 
+    | Var v -> match Env.lookup _env v with
+               | Env.Val exp -> Env.Val exp
+               | Env.Closure (exp, env) -> eval_d2 exp env
+    | Num _ | Float _ | Bool _ | Str _ | Unassigned -> Env.Val _exp
+    | Unop (u, e) -> u_eval u (eval_d2 e _env) 
+    | Binop (b, e1, e2) -> bin_eval b (eval_d2 e1 env) (eval_d2 e2 _env)
+    | Conditional (e1, e2, e3) -> if (eval_d2 e1 _env = Env.Val (Bool true)) 
+                                  then eval_d2 e2 _env
+                                  else eval_d2 e3 _env
+    | Fun (v, e) -> Env.Val (Fun (v, e))
+    | Let (v, edef, ebody) -> let new_value = ref (eval_d2 edef _env) in 
+                              eval_d2 ebody (Env.extend _env v new_value) 
+    | Letrec (v, edef, ebody) -> let new_value = ref (Env.Val Unassigned) in
+                                 let new_envir = Env.extend _env v new_value in
+                                 let newest_value = eval_d edef new_envir in
+                                  (match newest_value with
+                                  | Env.Val Var _  -> raise (EvalError ("Variable reached" ))
+                                  | _ -> new_value := newest_value; eval_d2 body new_envir )
+    | Raise -> raise EvalException
+    | App (func, ap) -> 
+            let ap2 = ref (eval_d2 ap _env) in
+            match eval_d2 func _env with
+            | Fun (x, b) -> eval_d2 b (Val.extend _env x ap2)
+            | _ -> raise (EvalError "can't apply expression to non-function")
+  in eval_d2 _exp _env*)
+;;
+     
 
-      
 (* The LEXICALLY-SCOPED ENVIRONMENT MODEL evaluator -- optionally
    completed as (part of) your extension *)
   
 let eval_l (_exp : expr) (_env : Env.env) : Env.value =
-  failwith "eval_l not implemented" ;;
+  failwith "eval_l not implemented" ;; 
 
 (* The EXTENDED evaluator -- if you want, you can provide your
    extension as a separate evaluator, or if it is type- and
@@ -223,4 +278,4 @@ let eval_e _ =
    above, not the evaluate function, so it doesn't matter how it's set
    when you submit your solution.) *)
    
-let evaluate = eval_d ;;
+let evaluate = eval_s ;;

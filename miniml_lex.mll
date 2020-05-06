@@ -43,14 +43,17 @@
                        ("*", TIMES);
                        ("/", DIVIDE);
                        ("(", OPEN);
-                       (")", CLOSE)
+                       (")", CLOSE);
+                       ("^", EXPONENT);
+                       ("!", FACT);
+                       ("%", MOD)
                      ]
 }
 
 let digit = ['0'-'9']
 let id = ['a'-'z'] ['a'-'z' '0'-'9']*
-let sym = ['(' ')'] | (['+' '-' '*' '.' '=' '~' ';' '<' '>' '/']+)
-let string = ['"'] [^ '"']* ['"']
+let sym = ['(' ')'] | (['+' '-' '*' '.' '=' '~' ';' '<' '>' '/' '^' '!' '%']+) 
+let string = ['"'][^ '"']* ['"']
 
 rule token = parse
   | digit+ as inum
@@ -82,8 +85,6 @@ rule token = parse
         { printf "Ignoring unrecognized character: %c\n" c;
           token lexbuf
         }
-
-
   | string as str
         {
           STR (String.sub str 1 (String.length str - 2))
@@ -94,7 +95,5 @@ rule token = parse
         { printf "Ignoring unrecognized character: %c\n" c;
         token lexbuf
         }
-
-
   | eof
         { raise End_of_file }

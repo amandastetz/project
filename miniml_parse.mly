@@ -10,9 +10,9 @@
 %token EOF
 %token OPEN CLOSE
 %token LET DOT IN REC
-%token NEG
+%token NEG FACT
 %token PLUS MINUS 
-%token TIMES DIVIDE
+%token TIMES DIVIDE EXPONENT MOD
 %token LESSTHAN EQUALS GREATERTHAN
 %token IF THEN ELSE 
 %token FUNCTION
@@ -25,10 +25,11 @@
 
 %nonassoc LESSTHAN
 %nonassoc GREATERTHAN
+%nonassoc MOD
 %nonassoc EQUALS
 %left PLUS MINUS
-%left TIMES DIVIDE
-%left NEG
+%left TIMES DIVIDE EXPONENT
+%left NEG FACT
 
 %start input
 %type <Expr.expr> input
@@ -50,10 +51,13 @@ expnoapp: INT                   { Num $1 }
         | exp MINUS exp         { Binop(Minus, $1, $3) }
         | exp TIMES exp         { Binop(Times, $1, $3) }
         | exp DIVIDE exp        { Binop(Divide, $1, $3) }
+        | exp MOD exp           { Binop(Mod, $1, $3) }        
         | exp EQUALS exp        { Binop(Equals, $1, $3) }
         | exp LESSTHAN exp      { Binop(LessThan, $1, $3) }
         | exp GREATERTHAN exp   { Binop(GreaterThan, $1, $3) }
+        | exp EXPONENT exp      { Binop(Exponent, $1, $3) }
         | NEG exp               { Unop(Negate, $2) }
+        | exp FACT              { Unop(Fact, $1) }
         | IF exp THEN exp ELSE exp      { Conditional($2, $4, $6) }
         | LET ID EQUALS exp IN exp      { Let($2, $4, $6) }
         | LET REC ID EQUALS exp IN exp  { Letrec($3, $5, $7) }

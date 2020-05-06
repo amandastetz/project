@@ -9,6 +9,7 @@
 
 type unop =
   | Negate
+  | Fact
 ;;
     
 type binop =
@@ -19,6 +20,8 @@ type binop =
   | Equals
   | LessThan
   | GreaterThan
+  | Exponent
+  | Mod
 ;;
 
 type varid = string ;;
@@ -70,7 +73,7 @@ let vars_of_list : string list -> varidset =
 let rec free_vars (exp : expr) : varidset =
   match exp with
   | Var v -> SS.singleton v                        
-  | Num _ | Bool _  | Float _  | Str _ -> SS.empty                                                 
+  | Num _ | Bool _  | Float _ | Str _ -> SS.empty                                                 
   | Unop (_, e) -> free_vars e                 
   | Binop (_, e1, e2) -> SS.union (free_vars e1) (free_vars e2)     
   | Conditional (e1, e2, e3) ->  SS.union (SS.union (free_vars e1) 
@@ -147,12 +150,14 @@ let rec subst (var_name : varid) (repl : expr) (exp : expr) : expr =
 
 let string_of_unop (u : unop) : string = 
   match u with
-  Negate -> "~-"
+  | Negate -> "~-"
+  | Fact -> "!"
 ;;
 
 let absrt_string_of_unop (u : unop) : string = 
   match u with
-  Negate -> "Negate"
+  | Negate -> "Negate"
+  | Fact -> "Fact"
 ;;
 
 let string_of_binop (bin : binop) : string = 
@@ -164,6 +169,8 @@ let string_of_binop (bin : binop) : string =
   | Equals -> "="
   | LessThan -> "<"
   | GreaterThan -> ">"
+  | Exponent -> "^"
+  | Mod -> "%"
 ;;   
 
 let absrt_string_of_binop (bin : binop) : string = 
@@ -175,6 +182,8 @@ let absrt_string_of_binop (bin : binop) : string =
   | Equals -> "Equals"
   | LessThan -> "LessThan"
   | GreaterThan -> "GreaterThan"
+  | Exponent -> "Exponent"
+  | Mod -> "Mod"
 ;;  
 
 let space : string = " " ;;
@@ -185,24 +194,24 @@ let rec exp_to_concrete_string (exp : expr) : string =
 	match exp with 
 	| Var v -> v                       
 	| Num n -> string_of_int n
-  | Float f -> string_of_float f                          
+  	| Float f -> string_of_float f                          
 	| Bool b -> string_of_bool b 
-  | Str s -> s                     
-  | Unop (u, e) -> string_of_unop u ^ exp_to_concrete_string e 
-  | Binop (b, e1, e2) -> "(" ^ exp_to_concrete_string e1 ^ space ^ 
+  	| Str s -> s                     
+  	| Unop (u, e) -> string_of_unop u ^ exp_to_concrete_string e 
+  	| Binop (b, e1, e2) -> "(" ^ exp_to_concrete_string e1 ^ space ^ 
   						           string_of_binop b ^ space ^ 
   						           exp_to_concrete_string e2 ^ ")"
-  | Conditional (e1, e2, e3) -> "if" ^ exp_to_concrete_string e1 ^
+  	| Conditional (e1, e2, e3) -> "if" ^ exp_to_concrete_string e1 ^
                                 space ^ "then" ^ exp_to_concrete_string e2 ^
                                 space ^ "else" ^ exp_to_concrete_string e3   
-  | Fun (v, e) -> "fun " ^ v ^ " -> " ^ exp_to_concrete_string e 
-  | Let (v, e1, e2) -> "let " ^ v ^ " = " ^ exp_to_concrete_string e1 ^ 
+  	| Fun (v, e) -> "fun " ^ v ^ " -> " ^ exp_to_concrete_string e 
+  	| Let (v, e1, e2) -> "let " ^ v ^ " = " ^ exp_to_concrete_string e1 ^ 
   						         " in " ^ exp_to_concrete_string e2 
-  | Letrec (v, e1, e2) -> "let rec " ^ v ^ " = " ^ exp_to_concrete_string e1 ^ 
+  	| Letrec (v, e1, e2) -> "let rec " ^ v ^ " = " ^ exp_to_concrete_string e1 ^ 
   					              " in " ^ exp_to_concrete_string e2  
-  | Raise -> "Raise"
-  | Unassigned -> "Unassigned"
-  | App (e1, e2) -> exp_to_concrete_string e1 ^ space ^ 
+  	| Raise -> "Raise"
+  	| Unassigned -> "Unassigned"
+  	| App (e1, e2) -> exp_to_concrete_string e1 ^ space ^ 
   				          exp_to_concrete_string e2
 ;;
 
@@ -212,28 +221,28 @@ let rec exp_to_abstract_string (exp : expr) : string =
 	match exp with
 	| Var v -> "Var(" ^ v ^ ")" 
 	| Num n -> "Num(" ^ string_of_int n ^ ")" 
-  | Float f -> "Float(" ^ string_of_float f ^ ")"  
+  	| Float f -> "Float(" ^ string_of_float f ^ ")"  
 	| Bool b -> "Bool(" ^ string_of_bool b ^ ")" 
-  | Str s -> "String(" ^ s ^ ")" 
+  	| Str s -> "String(" ^ s ^ ")" 
 	| Unop (u, e) -> "Unop(" ^ absrt_string_of_unop u ^ "," ^ 
                    space ^ exp_to_abstract_string e ^ ")" 
-  | Binop (b, e1, e2) -> "Binop(" ^ absrt_string_of_binop b ^ "," ^ 
+  	| Binop (b, e1, e2) -> "Binop(" ^ absrt_string_of_binop b ^ "," ^ 
                          space ^ exp_to_abstract_string e1 ^ 
                          "," ^ space ^ exp_to_abstract_string e2 ^ ")" 
-  | Conditional (e1, e2, e3) -> "Conditional(" ^ exp_to_abstract_string e1 ^
+  	| Conditional (e1, e2, e3) -> "Conditional(" ^ exp_to_abstract_string e1 ^
                                 "," ^ space ^ exp_to_abstract_string e2 ^
                                 "," ^ space ^ exp_to_abstract_string e3 ^ 
                                 ")" 
-  | Fun (v, e) -> "Fun(" ^ v ^ "," ^ space ^ exp_to_abstract_string e ^ 
-    				      ")"                 
-  | Let (v, e1, e2) -> "Let(" ^ v ^ "," ^ space ^ 
+  	| Fun (v, e) -> "Fun(" ^ v ^ "," ^ space ^ exp_to_abstract_string e ^ 
+  	  				      ")"                 
+  	| Let (v, e1, e2) -> "Let(" ^ v ^ "," ^ space ^ 
     					         exp_to_abstract_string e1 ^ "," ^ space ^ 
     					         exp_to_abstract_string e2 ^ ")"       
-  | Letrec (v, e1, e2) -> "Letrec(" ^ v ^ "," ^ space ^ 
+  	| Letrec (v, e1, e2) -> "Letrec(" ^ v ^ "," ^ space ^ 
     						          exp_to_abstract_string e1 ^ "," ^ 
     						          space ^ exp_to_abstract_string e2 ^ ")"         
-  | Raise -> "Raise"                               
-  | Unassigned -> "Unassigned"                          
-  | App (e1, e2) -> "App(" ^ exp_to_abstract_string e1 ^ "," ^ 
+  	| Raise -> "Raise"                               
+  	| Unassigned -> "Unassigned"                          
+  	| App (e1, e2) -> "App(" ^ exp_to_abstract_string e1 ^ "," ^ 
                     space ^ exp_to_abstract_string e2 ^ ")" 
 ;;
