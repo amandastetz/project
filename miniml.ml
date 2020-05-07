@@ -46,7 +46,7 @@ let repl () =
            just extract the expr back out and print it *)
         match res with
         | Val resexp ->
-          (* CAN SWITCH TO CONCRETE OR ABSTR HERE *)
+          (* Can switch between concrete and abstract syntax here *)
            printf "==> %s\n" (Ex.exp_to_concrete_string resexp)
         | _ -> failwith "not handling other cases yet"
            

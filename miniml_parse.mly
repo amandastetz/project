@@ -25,10 +25,9 @@
 
 %nonassoc LESSTHAN
 %nonassoc GREATERTHAN
-%nonassoc MOD
 %nonassoc EQUALS
 %left PLUS MINUS
-%left TIMES DIVIDE EXPONENT
+%left TIMES DIVIDE EXPONENT MOD
 %left NEG FACT
 
 %start input

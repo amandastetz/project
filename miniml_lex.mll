@@ -79,12 +79,6 @@ rule token = parse
             printf "Ignoring unrecognized token: %s\n" symbol;
             token lexbuf
         }
-  | '{' [^ '\n']* '}'   { token lexbuf }    (* skip one-line comments *)
-  | [' ' '\t' '\n']     { token lexbuf }    (* skip whitespace *)
-  | _ as c                                  (* warn and skip unrecognized characters *)
-        { printf "Ignoring unrecognized character: %c\n" c;
-          token lexbuf
-        }
   | string as str
         {
           STR (String.sub str 1 (String.length str - 2))

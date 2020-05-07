@@ -71,28 +71,26 @@ module Env : ENV =
       Closure (exp, env) ;;
 
     let lookup (env : env) (varname : varid) : value =
-      try
+      try 
         !(List.assoc varname env)
-      with
-        Not_found -> raise (EvalError("Not found"))
+      with Not_found -> raise (EvalError "Not Found")
       ;;
 
     let extend (env : env) (varname : varid) (loc : value ref) : env =
       try 
         let _v = lookup env varname in 
-          List.map (fun (var_name, var_value) -> 
-          if var_name = varname then (var_name, loc)
-          else (var_name, var_value)) env
-      with 
-        Not_found -> (varname, loc) :: env 
+        List.map (fun (var_name, var_value) -> 
+        if var_name = varname then (var_name, loc)
+        else (var_name, var_value)) env
+      with Not_found -> (varname, loc) :: env 
       ;;
 
     let rec value_to_string ?(printenvp : bool = true) (v : value) : string =
       match v with 
       | Val e -> exp_to_concrete_string e
-      | Closure (exp, env) -> if printenvp then  exp_to_concrete_string exp ^
-                              " in environment: " ^ env_to_string env
-                              else exp_to_concrete_string exp 
+      | Closure (ex, en) -> if printenvp then exp_to_concrete_string ex ^
+                              " environment: " ^ env_to_string en
+                              else exp_to_concrete_string ex 
     and env_to_string (env : env) : string =
       match env with
       | [] -> ""
@@ -100,7 +98,6 @@ module Env : ENV =
       | (var_id, val_ref) :: tl -> var_id ^ " = " ^ value_to_string !val_ref ^
                                    ", " ^ env_to_string tl
       ;;
-
   end
 ;;
 
@@ -136,72 +133,77 @@ let eval_t (exp : expr) (_env : Env.env) : Env.value =
 (* Coerces the value, unchanged, into an expr *)
 let make_expr (v : Env.value) : expr = 
   match v with
-  | Env.Closure (_, _) -> raise (EvalError "not number")
   | Env.Val v -> v
+  | Env.Closure (_, _) -> raise (EvalError "Cannot make expr of closure")
   ;;
 
+(* Int factorial function *)
 let rec fac (x : int) : int = 
   if x <= 1 then 1 else x * fac (x - 1) ;;
-
+(* Float factorial function *)
 let rec fl_fac (x : float) : float = 
   if x <= 1. then 1. else x *. fl_fac (x -. 1.) ;;
 
+(* Unop evaluator *)
 let u_eval (u : unop) (exp : expr) : Env.value =
    match u, exp with
-    | Negate, Num n -> Env.Val (Num (~- n))
+    (* Acceptable negate matches *)   
+    | Negate, Num n   -> Env.Val (Num (~- n))
     | Negate, Float f -> Env.Val (Float (~-. f))
-    | Negate, _ -> raise (EvalError "not number")
-    | Fact, Num n -> Env.Val (Num (fac n))
-    | Fact, Float n -> Env.Val (Float (fl_fac n))
-    | Fact, _ -> raise (EvalError "not number")
+    | Negate, _       -> raise (EvalError "Must be type int or float")
+    (* Acceptable fact matches *)   
+    | Fact, Num n     -> Env.Val (Num (fac n))
+    | Fact, Float n   -> Env.Val (Float (fl_fac n))
+    | Fact, _         -> raise (EvalError "Must be type int or float")
 ;;
 
+(* Binop evaluator *)
 let bin_eval (b : binop) (e1 : expr) (e2 : expr) : Env.value = 
   match b, e1, e2 with
-  | Plus, Num x, Num y -> Env.Val (Num (x + y))
+  (* Acceptable plus matches *)
+  | Plus, Num x, Num y     -> Env.Val (Num (x + y))
   | Plus, Float x, Float y -> Env.Val (Float (x +. y))
-  | Plus, _, _ -> raise (EvalError "not numbers")
-
-  | Minus, Num x, Num y -> Env.Val (Num (x - y))
+  | Plus, _, _             -> raise (EvalError "Must be type int or float")
+  (* Acceptable minus matches *)
+  | Minus, Num x, Num y     -> Env.Val (Num (x - y))
   | Minus, Float x, Float y -> Env.Val (Float (x -. y))
-  | Minus, _, _ -> raise (EvalError "not numbers")
-
-  | Times, Num x, Num y -> Env.Val (Num (x * y))
+  | Minus, _, _             -> raise (EvalError "Must be type int or float")
+  (* Acceptable times matches *)
+  | Times, Num x, Num y     -> Env.Val (Num (x * y))
   | Times, Float x, Float y -> Env.Val (Float (x *. y))
-  | Times, _, _ -> raise (EvalError "not numbers")
-
-  | Divide, Num x, Num y -> Env.Val (Num (x / y))
+  | Times, _, _             -> raise (EvalError "Must be type int or float")
+  (* Acceptable divide matches *)
+  | Divide, Num x, Num y     -> Env.Val (Num (x / y))
   | Divide, Float x, Float y -> Env.Val (Float (x /. y))
-  | Divide, _, _ -> raise (EvalError "not numbers")
-
+  | Divide, _, _             -> raise (EvalError "Must be type int or float")
+  (* Acceptable mod matches *)
   | Mod, Num x, Num y -> Env.Val (Num (x mod y))
-  | Mod, _, _ -> raise (EvalError "not integers")
-
+  | Mod, _, _         -> raise (EvalError "Must be type int")
+  (* Acceptable exponent matches *)
   | Exponent, Float x, Float y -> Env.Val (Float (x ** y))
-  | Exponent, _, _ -> raise (EvalError "not floats")
-
-  | LessThan, Num x, Num y -> Env.Val (Bool (x < y))
+  | Exponent, _, _             -> raise (EvalError "Must be type float")
+  (* Acceptable lessthan matches *)
+  | LessThan, Num x, Num y     -> Env.Val (Bool (x < y))
   | LessThan, Float x, Float y -> Env.Val (Bool (x < y))
-  | LessThan, _, _ -> raise (EvalError "not numbers")
-
-  | GreaterThan, Num x, Num y -> Env.Val (Bool (x > y))
+  | LessThan, _, _             -> raise (EvalError "Unable to be compared")
+  (* Acceptable greaterthan matches *)
+  | GreaterThan, Num x, Num y     -> Env.Val (Bool (x > y))
   | GreaterThan, Float x, Float y -> Env.Val (Bool (x > y))
-  | GreaterThan, _, _ -> raise (EvalError "not numbers")
-
-  | Equals, Num x, Num y -> Env.Val (Bool (x = y))
+  | GreaterThan, _, _             -> raise (EvalError "Unable to be compared")
+  (* Acceptable equals matches *)
+  | Equals, Num x, Num y     -> Env.Val (Bool (x = y))
   | Equals, Float x, Float y -> Env.Val (Bool (x = y))
-  | Equals, Bool x, Bool y -> Env.Val (Bool (x = y))
-  | Equals, Str x, Str y -> Env.Val (Bool (x = y))
-  | Equals, _, _ ->  raise (EvalError "not equal")
-
+  | Equals, Bool x, Bool y   -> Env.Val (Bool (x = y))
+  | Equals, Str x, Str y     -> Env.Val (Bool (x = y))
+  | Equals, _, _             -> raise (EvalError "Unable to be compared")
 ;; 
 
-(* The SUBSTITUTION MODEL evaluator -- to be completed *)
-   
+(* The SUBSTITUTION MODEL evaluator -- to be completed *) 
+
 let eval_s (_exp : expr) (_env : Env.env) : Env.value =
   let rec eval2 (ex : expr) : Env.value =
     match ex with
-    | Var _ -> raise (EvalError ("Unbound Variable"))                
+    | Var _ -> raise (EvalError "Unbound Variable")                
     | Num _ | Float _ | Bool _ | Str _ | Unassigned -> Env.Val ex                                                
     | Unop (u, e) -> u_eval u (make_expr(eval2 e))                
     | Binop (b, e1, e2) -> bin_eval b (make_expr(eval2 e1)) 
@@ -214,46 +216,53 @@ let eval_s (_exp : expr) (_env : Env.env) : Env.value =
     | Letrec (v, e1, e2) -> eval2 (subst v (subst v 
                             (Letrec (v, e1, Var v)) e1) e2)  
     | Raise -> raise EvalException          
-    | App (e1, e2) -> 
-        match eval2 e1 with 
-        | Env.Val Fun (v, e3) -> eval2 (subst v (make_expr(eval2 e2)) e3)
-        | _ -> raise (EvalError "bad redex")
+    | App (e1, e2) -> match eval2 e1 with 
+                      | Env.Val Fun (v, e3) -> 
+                        eval2 (subst v (make_expr(eval2 e2)) e3)
+                      | _ -> raise (EvalError "Bad Redex")
   in
   eval2 _exp ;; 
      
 (* The DYNAMICALLY-SCOPED ENVIRONMENT MODEL evaluator -- to be
    completed *)
-   
+
 let eval_d (_exp : expr) (_env : Env.env) : Env.value =
-  failwith "eval_l not implemented"
+    failwith "eval_l not implemented" ;;
+
+
   (*let rec eval_d2 (_exp : expr) (_env : Env.env) : Env.value =
     match _exp with 
-    | Var v -> match Env.lookup _env v with
-               | Env.Val exp -> Env.Val exp
-               | Env.Closure (exp, env) -> eval_d2 exp env
+    | Var v -> try 
+                 Env.lookup _env v 
+               with Not_found -> raise (EvalError "Unbound Variable")
     | Num _ | Float _ | Bool _ | Str _ | Unassigned -> Env.Val _exp
-    | Unop (u, e) -> u_eval u (eval_d2 e _env) 
-    | Binop (b, e1, e2) -> bin_eval b (eval_d2 e1 env) (eval_d2 e2 _env)
+    | Unop (u, e) -> u_eval u (make_expr(eval_d2 e _env)) 
+    | Binop (b, e1, e2) -> bin_eval b (make_expr(eval_d2 e1 _env)) 
+                                      (make_expr(eval_d2 e2 _env))
     | Conditional (e1, e2, e3) -> if (eval_d2 e1 _env = Env.Val (Bool true)) 
-                                  then eval_d2 e2 _env
+                                  then eval_d2 e2 _env 
                                   else eval_d2 e3 _env
-    | Fun (v, e) -> Env.Val (Fun (v, e))
+    
+    | Fun (v, e) -> Env.lookup _env (Env.Val (Fun (v, e)))
+    
     | Let (v, edef, ebody) -> let new_value = ref (eval_d2 edef _env) in 
                               eval_d2 ebody (Env.extend _env v new_value) 
     | Letrec (v, edef, ebody) -> let new_value = ref (Env.Val Unassigned) in
                                  let new_envir = Env.extend _env v new_value in
-                                 let newest_value = eval_d edef new_envir in
-                                  (match newest_value with
-                                  | Env.Val Var _  -> raise (EvalError ("Variable reached" ))
-                                  | _ -> new_value := newest_value; eval_d2 body new_envir )
+                                 let newest_value = eval_d2 edef new_envir in
+                                  match newest_value with
+                                  | Env.Val Var _  -> raise (EvalError 
+                                                      "Variable reached")
+                                  | _ -> new_value := newest_value; 
+                                         eval_d2 ebody new_envir
     | Raise -> raise EvalException
-    | App (func, ap) -> 
-            let ap2 = ref (eval_d2 ap _env) in
-            match eval_d2 func _env with
-            | Fun (x, b) -> eval_d2 b (Val.extend _env x ap2)
-            | _ -> raise (EvalError "can't apply expression to non-function")
-  in eval_d2 _exp _env*)
-;;
+    | App (func, ap) -> let func2 = eval_d2 func _env in
+                        let ap2 = ref (eval_d2 ap _env) in
+                        match func2 with
+                        | Fun (x, b) -> eval_d2 b (Env.extend _env x ap2)
+                        | _ -> raise (EvalError "Non-function")
+  in eval_d2 _exp _env
+;;*)
      
 
 (* The LEXICALLY-SCOPED ENVIRONMENT MODEL evaluator -- optionally
