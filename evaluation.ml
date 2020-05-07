@@ -227,14 +227,11 @@ let eval_s (_exp : expr) (_env : Env.env) : Env.value =
    completed *)
 
 let eval_d (_exp : expr) (_env : Env.env) : Env.value =
-    failwith "eval_l not implemented" ;;
-
-
-  (*let rec eval_d2 (_exp : expr) (_env : Env.env) : Env.value =
+  let rec eval_d2 (_exp : expr) (_env : Env.env) : Env.value =
     match _exp with 
-    | Var v -> try 
+    | Var v -> (try 
                  Env.lookup _env v 
-               with Not_found -> raise (EvalError "Unbound Variable")
+               with Not_found -> raise (EvalError "Unbound Variable"))
     | Num _ | Float _ | Bool _ | Str _ | Unassigned -> Env.Val _exp
     | Unop (u, e) -> u_eval u (make_expr(eval_d2 e _env)) 
     | Binop (b, e1, e2) -> bin_eval b (make_expr(eval_d2 e1 _env)) 
@@ -242,27 +239,23 @@ let eval_d (_exp : expr) (_env : Env.env) : Env.value =
     | Conditional (e1, e2, e3) -> if (eval_d2 e1 _env = Env.Val (Bool true)) 
                                   then eval_d2 e2 _env 
                                   else eval_d2 e3 _env
-    
-    | Fun (v, e) -> Env.lookup _env (Env.Val (Fun (v, e)))
-    
+    | Fun (v, e) -> Env.Val (Fun (v, e))
     | Let (v, edef, ebody) -> let new_value = ref (eval_d2 edef _env) in 
-                              eval_d2 ebody (Env.extend _env v new_value) 
+                                eval_d2 ebody (Env.extend _env v new_value) 
     | Letrec (v, edef, ebody) -> let new_value = ref (Env.Val Unassigned) in
                                  let new_envir = Env.extend _env v new_value in
                                  let newest_value = eval_d2 edef new_envir in
-                                  match newest_value with
-                                  | Env.Val Var _  -> raise (EvalError 
-                                                      "Variable reached")
-                                  | _ -> new_value := newest_value; 
-                                         eval_d2 ebody new_envir
+                                  new_value := newest_value;
+                                  eval_d2 ebody new_envir
     | Raise -> raise EvalException
     | App (func, ap) -> let func2 = eval_d2 func _env in
                         let ap2 = ref (eval_d2 ap _env) in
-                        match func2 with
-                        | Fun (x, b) -> eval_d2 b (Env.extend _env x ap2)
-                        | _ -> raise (EvalError "Non-function")
+                        (match func2 with
+                        | Env.Val (Fun (x, b)) -> eval_d2 b 
+                                                  (Env.extend _env x ap2)
+                        | _ -> raise (EvalError "Non-function"))    
   in eval_d2 _exp _env
-;;*)
+;;
      
 
 (* The LEXICALLY-SCOPED ENVIRONMENT MODEL evaluator -- optionally
